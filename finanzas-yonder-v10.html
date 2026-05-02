@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Finanzas Yonder V10</title>
+<style>
+:root{
+  --bg:#0f1115; --card:#1a1d24; --field:#2a2f38; --line:#343946;
+  --text:#ffffff; --muted:#a7abb5; --green:#00d26a; --yellow:#ffd400; --red:#ff4d4f; --blue:#4da3ff;
+}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;background:var(--bg);color:var(--text);margin:0;padding:20px 20px 90px}
+.container{max-width:430px;margin:auto}
+.page{display:none}.page.active{display:block}
+h1{font-size:26px;margin:0 0 16px}
+.card{background:var(--card);padding:16px;border-radius:18px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.amount{font-size:24px;font-weight:800;margin-top:4px}
+.label{color:var(--muted);font-size:13px}
+.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}.blue{color:var(--blue)}
+input,select{width:100%;padding:14px;margin-top:10px;border-radius:13px;border:none;background:var(--field);color:#fff;font-size:16px}
+button{width:100%;padding:14px;margin-top:10px;border-radius:13px;border:none;background:#fff;color:#000;font-weight:800;font-size:16px;cursor:pointer}
+.danger{background:var(--red);color:#fff}
+.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.item{border-bottom:1px solid var(--line);padding:10px 0;font-size:14px}
+.item:last-child{border-bottom:0}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.small{font-size:12px;color:var(--muted);margin-top:3px}
+.progress{height:8px;background:#303542;border-radius:50px;overflow:hidden;margin-top:8px}
+.bar{height:100%;width:0%;border-radius:50px;background:var(--green)}
+.bar.yellow{background:var(--yellow)}.bar.red{background:var(--red)}
+.nav{position:fixed;left:0;right:0;bottom:0;background:#151821;border-top:1px solid #262b36;display:flex;z-index:10}
+.nav button{background:transparent;color:var(--muted);border-radius:0;margin:0;padding:14px 4px;font-size:12px}
+.nav button.active{color:white}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+</style>
+</head>
+<body>
+
+<div id="homePage" class="container page active">
+  <h1>Finanzas Yonder</h1>
+
+  <div class="grid">
+    <div class="card"><div class="label">Ingresos</div><div id="incomeTotal" class="amount green">$0</div></div>
+    <div class="card"><div class="label">Gastos</div><div id="expenseTotal" class="amount red">$0</div></div>
+    <div class="card"><div class="label">Inversiones</div><div id="investmentTotal" class="amount blue">$0</div></div>
+    <div class="card"><div class="label">Ahorros</div><div id="savingTotal" class="amount">$0</div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Disponible</div>
+    <div id="remainingTotal" class="amount">$0</div>
+  </div>
+
+  <div class="card">
+    <strong>Agregar movimiento</strong>
+    <input id="amountInput" type="number" placeholder="Monto" />
+    <select id="typeInput" onchange="updateCategorySelect()">
+      <option value="expense">Gasto</option>
+      <option value="income">Ingreso</option>
+      <option value="investment">Inversión</option>
+      <option value="saving">Ahorro</option>
+    </select>
+    <select id="categoryInput"></select>
+    <input id="conceptInput" placeholder="Concepto (ej: bondiola, Uber, cliente X)" />
+    <button onclick="addTransaction()">Agregar</button>
+  </div>
+
+  <div class="card">
+    <strong>Últimos 5 movimientos</strong>
+    <div id="latestList"></div>
+    <button class="ghost" onclick="toggleFullHistory()">Ver historial completo</button>
+  </div>
+
+  <div id="fullHistoryCard" class="card" style="display:none">
+    <strong>Historial completo</strong>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<div id="categoriesPage" class="container page">
+  <h1>Gastos por categoría</h1>
+  <div class="card">
+    <div id="categoryAnalysis"></div>
+  </div>
+</div>
+
+<div id="budgetsPage" class="container page">
+  <h1>Presupuestos</h1>
+  <div class="card">
+    <strong>Crear / actualizar categoría</strong>
+    <input id="budgetCategoryInput" placeholder="Categoría (ej: Comida)" />
+    <input id="budgetLimitInput" type="number" placeholder="Presupuesto máximo" />
+    <button onclick="addBudget()">Guardar</button>
+  </div>
+  <div class="card">
+    <strong>Categorías creadas</strong>
+    <div id="budgetList"></div>
+  </div>
+</div>
+
+<div id="settingsPage" class="container page">
+  <h1>Mes</h1>
+
+  <div class="card">
+    <strong>Descargar mes</strong>
+    <p class="small">Descarga todos los movimientos registrados: ingresos, gastos, inversiones y ahorros con categoría, concepto, fecha y hora.</p>
+    <button onclick="downloadMonth()">Descargar mes</button>
+  </div>
+
+  <div class="card">
+    <strong>Resetear mes</strong>
+    <p class="small">Esto elimina todos los movimientos del mes, pero conserva tus presupuestos y categorías.</p>
+    <button class="danger" onclick="resetMonth()">Resetear mes</button>
+  </div>
+</div>
+
+<div class="nav">
+  <button id="navHome" class="active" onclick="showPage('homePage','navHome')">Inicio</button>
+  <button id="navCategories" onclick="showPage('categoriesPage','navCategories')">Categorías</button>
+  <button id="navBudgets" onclick="showPage('budgetsPage','navBudgets')">Presupuestos</button>
+  <button id="navSettings" onclick="showPage('settingsPage','navSettings')">Mes</button>
+</div>
+
+<script>
+let transactions = JSON.parse(localStorage.getItem("fy_transactions")) || JSON.parse(localStorage.getItem("transactions")) || [];
+let budgetData = JSON.parse(localStorage.getItem("fy_budgets")) || JSON.parse(localStorage.getItem("budgets")) || {};
+
+const fallbackCategories = {
+  income:["Sueldo","Cliente","Freelance","Regalo","Otros"],
+  investment:["BTC","SPY","USDT","Binance","Otros"],
+  saving:["Ahorro","Fondo de emergencia","Otros"]
+};
+
+function saveAll(){
+  localStorage.setItem("fy_transactions", JSON.stringify(transactions));
+  localStorage.setItem("fy_budgets", JSON.stringify(budgetData));
+}
+
+function money(n){
+  return "$" + Number(n || 0).toLocaleString("es-AR", {maximumFractionDigits:2});
+}
+
+function showPage(pageId, navId){
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(pageId).classList.add("active");
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.remove("active"));
+  document.getElementById(navId).classList.add("active");
+  renderAll();
+}
+
+function expenseCategories(){
+  return Object.keys(budgetData);
+}
+
+function updateCategorySelect(){
+  const type = document.getElementById("typeInput").value;
+  const select = document.getElementById("categoryInput");
+  select.innerHTML = "";
+
+  const list = type === "expense" ? expenseCategories() : fallbackCategories[type];
+
+  if(!list || list.length === 0){
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Primero crea categorías en Presupuestos";
+    select.appendChild(option);
+    return;
+  }
+
+  list.forEach(cat=>{
+    const option = document.createElement("option");
+    option.value = cat;
+    option.textContent = cat;
+    select.appendChild(option);
+  });
+}
+
+function addBudget(){
+  const cat = document.getElementById("budgetCategoryInput").value.trim();
+  const limit = Number(document.getElementById("budgetLimitInput").value);
+
+  if(!cat || !limit) return alert("Agrega una categoría y un presupuesto válido.");
+
+  budgetData[cat] = limit;
+  document.getElementById("budgetCategoryInput").value = "";
+  document.getElementById("budgetLimitInput").value = "";
+  saveAll();
+  updateCategorySelect();
+  renderAll();
+}
+
+function addTransaction(){
+  const amount = Number(document.getElementById("amountInput").value);
+  const type = document.getElementById("typeInput").value;
+  const category = document.getElementById("categoryInput").value;
+  const concept = document.getElementById("conceptInput").value.trim();
+
+  if(!amount) return alert("Ingresa un monto.");
+  if(!category) return alert("Primero crea una categoría en Presupuestos.");
+
+  transactions.push({
+    id: Date.now(),
+    amount,
+    type,
+    category,
+    concept,
+    date: new Date().toISOString()
+  });
+
+  document.getElementById("amountInput").value = "";
+  document.getElementById("conceptInput").value = "";
+
+  saveAll();
+  renderAll();
+}
+
+function totals(){
+  return transactions.reduce((acc,t)=>{
+    if(t.type==="income") acc.income += Number(t.amount);
+    if(t.type==="expense") acc.expense += Number(t.amount);
+    if(t.type==="investment") acc.investment += Number(t.amount);
+    if(t.type==="saving") acc.saving += Number(t.amount);
+    return acc;
+  }, {income:0, expense:0, investment:0, saving:0});
+}
+
+function renderTotals(){
+  const t = totals();
+  document.getElementById("incomeTotal").textContent = money(t.income);
+  document.getElementById("expenseTotal").textContent = money(t.expense);
+  document.getElementById("investmentTotal").textContent = money(t.investment);
+  document.getElementById("savingTotal").textContent = money(t.saving);
+  document.getElementById("remainingTotal").textContent = money(t.income - t.expense - t.investment - t.saving);
+}
+
+function typeLabel(type){
+  return {income:"Ingreso", expense:"Gasto", investment:"Inversión", saving:"Ahorro"}[type] || type;
+}
+
+function renderMovementList(targetId, limit){
+  const box = document.getElementById(targetId);
+  box.innerHTML = "";
+  const list = transactions.slice().reverse();
+  const finalList = limit ? list.slice(0, limit) : list;
+
+  if(finalList.length === 0){
+    box.innerHTML = `<div class="empty">Todavía no hay movimientos.</div>`;
+    return;
+  }
+
+  finalList.forEach(t=>{
+    const d = new Date(t.date);
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `
+      <div class="row">
+        <strong>${t.category} ${t.concept ? "– " + t.concept : ""}</strong>
+        <strong>${money(t.amount)}</strong>
+      </div>
+      <div class="small">${typeLabel(t.type)} · ${d.toLocaleDateString("es-AR")} · ${d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})}</div>
+    `;
+    box.appendChild(item);
+  });
+}
+
+function renderBudgets(){
+  const box = document.getElementById("budgetList");
+  box.innerHTML = "";
+
+  const cats = Object.keys(budgetData);
+  if(cats.length === 0){
+    box.innerHTML = `<div class="empty">Crea tus categorías de presupuesto. Esas mismas serán las categorías de gasto.</div>`;
+    return;
+  }
+
+  cats.forEach(cat=>{
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `<div class="row"><strong>${cat}</strong><strong>${money(budgetData[cat])}</strong></div>`;
+    box.appendChild(item);
+  });
+}
+
+function spentByCategory(){
+  const map = {};
+  Object.keys(budgetData).forEach(cat=> map[cat] = 0);
+
+  transactions.forEach(t=>{
+    if(t.type === "expense"){
+      if(map[t.category] === undefined) map[t.category] = 0;
+      map[t.category] += Number(t.amount);
+    }
+  });
+
+  return map;
+}
+
+function renderCategoryAnalysis(){
+  const box = document.getElementById("categoryAnalysis");
+  box.innerHTML = "";
+
+  const map = spentByCategory();
+  const cats = Object.keys(map).sort((a,b)=>map[b]-map[a]);
+
+  if(cats.length === 0){
+    box.innerHTML = `<div class="empty">Aún no hay categorías. Créalas en Presupuestos.</div>`;
+    return;
+  }
+
+  cats.forEach(cat=>{
+    const spent = map[cat] || 0;
+    const limit = Number(budgetData[cat] || 0);
+    const percent = limit ? (spent / limit) * 100 : 0;
+
+    let color = "green";
+    if(limit && percent >= 100) color = "red";
+    else if(limit && percent >= 65) color = "yellow";
+
+    const shownPercent = limit ? Math.min(percent, 100) : 0;
+
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `
+      <div class="row ${color}">
+        <strong>${cat}</strong>
+        <strong>${money(spent)}${limit ? " / " + money(limit) : " / sin límite"}</strong>
+      </div>
+      <div class="progress"><div class="bar ${color}" style="width:${shownPercent}%"></div></div>
+      <div class="small">${limit ? Math.round(percent) + "% usado" : "Sin presupuesto asignado"}</div>
+    `;
+    box.appendChild(item);
+  });
+}
+
+function toggleFullHistory(){
+  const card = document.getElementById("fullHistoryCard");
+  card.style.display = card.style.display === "none" ? "block" : "none";
+  renderMovementList("historyList");
+}
+
+function downloadMonth(){
+  if(transactions.length === 0) return alert("No hay movimientos para descargar.");
+
+  const rows = [
+    ["Tipo","Categoría","Concepto","Monto","Fecha","Hora"]
+  ];
+
+  transactions.forEach(t=>{
+    const d = new Date(t.date);
+    rows.push([
+      typeLabel(t.type),
+      t.category || "",
+      t.concept || "",
+      Number(t.amount || 0),
+      d.toLocaleDateString("es-AR"),
+      d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"})
+    ]);
+  });
+
+  const csv = rows.map(row => row.map(cell => `"${String(cell).replaceAll('"','""')}"`).join(",")).join("\\n");
+  const blob = new Blob(["\\ufeff" + csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+
+  const now = new Date();
+  const filename = `finanzas-yonder-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}.csv`;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function resetMonth(){
+  const ok = confirm("¿Estás seguro que quieres resetear el mes? Esto eliminará todos los movimientos registrados, pero mantendrá tus presupuestos.");
+  if(!ok) return;
+
+  transactions = [];
+  saveAll();
+  renderAll();
+  alert("Mes reseteado. Ya puedes empezar desde cero.");
+}
+
+function renderAll(){
+  renderTotals();
+  renderMovementList("latestList", 5);
+  renderMovementList("historyList");
+  renderBudgets();
+  renderCategoryAnalysis();
+}
+
+updateCategorySelect();
+renderAll();
+</script>
+</body>
+</html>
